@@ -17,6 +17,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+from app.core.crypto import EncryptedString
 
 
 class Gender(str, Enum):
@@ -37,7 +38,7 @@ class Employee(Base):
 
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
 
-    employee_id = Column(String, unique=True, index=True, nullable=False)
+    employee_id = Column(String, unique=True, index=True, nullable=True)
     interview_date = Column(DateTime, nullable=True)
 
     role = Column(SQLEnum(RoleName), nullable=False, default=RoleName.EMPLOYEE)
@@ -52,16 +53,16 @@ class Employee(Base):
     alt_contact_no = Column(String(15), nullable=True)
     date_of_birth = Column(Date, nullable=True)
 
-    pan = Column(String, nullable=True)
-    aadhar = Column(String, nullable=True)
+    pan = Column(EncryptedString, nullable=True)
+    aadhar = Column(EncryptedString, nullable=True)
 
     current_address = Column(Text, nullable=True)
     permanent_address = Column(Text, nullable=True)
 
     # Bank details
-    bank_name = Column(String(150), nullable=True)
-    bank_account_no = Column(String, nullable=True)
-    bank_ifsc = Column(String, nullable=True)
+    bank_name = Column(EncryptedString, nullable=True)
+    bank_account_no = Column(EncryptedString, nullable=True)
+    bank_ifsc = Column(EncryptedString, nullable=True)
 
     # Qualification & experience
     qualifications = Column(ARRAY(String), nullable=True)
