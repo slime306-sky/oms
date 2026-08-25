@@ -18,6 +18,7 @@ from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 from app.core.crypto import EncryptedString
+from app.database.models.department import employee_departments
 
 
 class Gender(str, Enum):

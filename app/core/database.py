@@ -1,9 +1,12 @@
 import os
 
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Render may provide postgres:// URLs
 if DATABASE_URL.startswith("postgres://"):
@@ -11,7 +14,7 @@ if DATABASE_URL.startswith("postgres://"):
 
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"sslmode": "require"},
+    # connect_args={"sslmode": "require"},
     pool_pre_ping=True,
     pool_recycle=int(os.environ.get("DB_POOL_RECYCLE_SECONDS", "300")),
 )
