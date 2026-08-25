@@ -3,11 +3,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import api_error
-from app.models.user import User
-from app.models.department import Department
-from app.models.employee import Employee, RoleName
-from app.models.family_member import FamilyMember
-from app.auth.schemas import RegisterRequest
+from app.database.models.users import User
+from app.database.models.department import Department
+from app.database.models.employee import Employee, RoleName
+from app.database.models.family_member import FamilyMember
+from app.schema.auth import RegisterRequest
 from app.utility.custom_id import generate_employee_id
 
 def register_employee(data: RegisterRequest, db: Session) -> Employee:

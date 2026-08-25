@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Response
+from fastapi.params import Cookie
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -17,14 +18,14 @@ from app.core.security import (
     get_db,
 )
 
-from app.models.employee import Gender, RoleName
-from app.models.user import User, UserType
-from app.models.main_admin import MainAdmin
-from app.models.refresh_token import RefreshToken
+from app.database.models.employee import Gender, RoleName
+from app.database.models.users import User, UserType
+from app.database.models.main_admin import MainAdmin
+from app.database.models.refresh_token import RefreshToken
 
-from app.auth.schemas import LoginRequest, RegisterRequest
-from app.auth.service import register_employee, update_employee_id
-from app.auth.auth_dependencies import get_current_user_optional
+from app.schema.auth import LoginRequest, RegisterRequest
+from app.services.auth import register_employee, update_employee_id
+from app.services.auth_dependencies import require_admin
 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -34,7 +35,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 def register(
     data: RegisterRequest,
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User = Depends(require_admin),
 ):
     existing_user = db.scalar(
         select(User).where(
@@ -55,15 +56,6 @@ def register(
             code="MORE_INFORMATION_IS_NEEDED",
             message="Employee information is required",
         )
-
-    if data.user_type == UserType.MAIN_ADMIN:
-        is_existing_admin = current_user is not None and current_user.main_admin is not None
-        if not is_existing_admin:
-            raise api_error(
-                status_code=403,
-                code="ADMIN_REGISTRATION_NOT_ALLOWED",
-                message="Only an existing admin can create another admin account",
-            )
 
     user = User(
         username=data.username,
@@ -99,7 +91,7 @@ def register(
 
 
 @router.get("/register")
-def get_register_enums():
+def get_register_enums(current_user: User = Depends(require_admin)):
     return {
         "user_type": [e.value for e in UserType],
         "role": [e.value for e in RoleName],
@@ -135,15 +127,6 @@ def login(
     db.commit()
 
     response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=True,
-        samesite="lax",
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        path="/",
-    )
-    response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
@@ -155,6 +138,8 @@ def login(
 
     return {
         "message": "Login successful",
+        "access_token": access_token,
+        "token_type": "bearer",
         "user": {
             "id": user.id,
             "username": user.username,
@@ -162,3 +147,39 @@ def login(
             "user_type": user.user_type.value,
         },
     }
+
+
+@router.post("/refresh")
+def refresh(
+    response: Response,
+    db: Session = Depends(get_db),
+    refresh_token: Optional[str] = Cookie(default=None),
+):
+    if not refresh_token:
+        raise api_error(401, "NOT_AUTHENTICATED", "Refresh token missing")
+
+    token_hash = hash_refresh_token(refresh_token)
+    now = datetime.now(timezone.utc)
+    token_record = db.scalar(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
+
+    if not token_record or token_record.revoked_at or token_record.expires_at < now:
+        raise api_error(401, "INVALID_REFRESH_TOKEN", "Refresh token is invalid or expired")
+
+    user = db.get(User, token_record.user_id)
+    access_token = create_access_token(user_id=user.id, user_type=user.user_type.value)
+
+    # rotate refresh token
+    token_record.revoked_at = now
+    new_refresh_token = create_refresh_token()
+    db.add(RefreshToken(
+        user_id=user.id,
+        token_hash=hash_refresh_token(new_refresh_token),
+        created_at=now,
+        expires_at=now + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+    ))
+    db.commit()
+
+    response.set_cookie("refresh_token", new_refresh_token, httponly=True, secure=True,
+                         samesite="lax", max_age=REFRESH_TOKEN_EXPIRE_DAYS*24*60*60, path="/auth")
+
+    return {"access_token": access_token, "token_type": "bearer"}

@@ -4,8 +4,17 @@ from cryptography.fernet import Fernet
 from sqlalchemy import String
 from sqlalchemy.types import TypeDecorator
 
-_key = os.environ["FIELD_ENCRYPTION_KEY"]
-_fernet = Fernet(_key.encode() if isinstance(_key, str) else _key)
+from dotenv import load_dotenv
+from cryptography.fernet import Fernet
+
+load_dotenv()
+
+_key = os.getenv("FERNET_KEY")
+
+if not _key:
+    raise RuntimeError("FERNET_KEY is not set")
+
+_fernet = Fernet(_key.encode())
 
 
 class EncryptedString(TypeDecorator):

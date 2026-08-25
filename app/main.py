@@ -1,6 +1,9 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
-from app.auth.router import router as auth_router
+from app.api.v1.routes import router as auth_router
+from app.core.database import Base, engine
 from app.core.errors import (
     http_exception_handler,
     validation_exception_handler,
@@ -9,7 +12,27 @@ from app.core.errors import (
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-app = FastAPI()
+# Import all models so they're registered on Base.metadata before create_all runs.
+from app.database.models import (  # noqa: F401
+    users,
+    employee,
+    department,
+    family_member,
+    main_admin,
+    refresh_token,
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Creates any tables that don't exist yet. Safe to run every startup —
+    # it's a no-op for tables that already exist. Swap this for Alembic
+    # migrations once you need schema changes on an existing database.
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.include_router(auth_router)
 

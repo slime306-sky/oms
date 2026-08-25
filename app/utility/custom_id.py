@@ -1,7 +1,7 @@
 from datetime import date
 
 from app.core.errors import api_error
-from app.models.user import User
+from app.database.models.users import User
 
 def generate_employee_id(user: User) -> str:
     employee = user.employee

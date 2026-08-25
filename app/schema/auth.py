@@ -4,8 +4,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
-from app.models.employee import Gender, RoleName
-from app.models.user import UserType
+from app.database.models.employee import Gender, RoleName
+from app.database.models.users import UserType
 
 
 class FamilyMemberCreate(BaseModel):
